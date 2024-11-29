@@ -4,7 +4,7 @@ from .routers import wallets
 
 app = FastAPI(
     title="Wallet API",
-    description="API для управления кошельками и транзакциями",
+    description="API for managing wallets and transactions",
     version="1.0.0"
 )
 

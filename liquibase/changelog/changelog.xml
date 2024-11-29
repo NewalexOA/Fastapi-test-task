@@ -6,9 +6,10 @@
     http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
 
     <changeSet id="001" author="developer" context="production">
-        <comment>Создание таблицы кошельков</comment>
+        <comment>Initial database setup</comment>
         
-        <createTable tableName="wallets" remarks="Таблица для хранения информации о кошельках">
+        <!-- Wallets table -->
+        <createTable tableName="wallets" remarks="Table for storing wallet information">
             <column name="id" type="UUID">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -22,16 +23,9 @@
                 <constraints nullable="false"/>
             </column>
         </createTable>
-        
-        <rollback>
-            <dropTable tableName="wallets"/>
-        </rollback>
-    </changeSet>
 
-    <changeSet id="002" author="developer" context="production">
-        <comment>Создание таблицы транзакций</comment>
-        
-        <createTable tableName="transactions" remarks="Таблица для хранения истории транзакций">
+        <!-- Transactions table -->
+        <createTable tableName="transactions" remarks="Table for storing transaction history">
             <column name="id" type="UUID">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -55,19 +49,27 @@
             </column>
         </createTable>
 
-        <createIndex indexName="idx_transactions_wallet_id"
-                    tableName="transactions">
+        <!-- Indexes -->
+        <createIndex indexName="idx_wallets_balance" tableName="wallets">
+            <column name="balance"/>
+        </createIndex>
+
+        <createIndex indexName="idx_transactions_wallet_id" tableName="transactions">
             <column name="wallet_id"/>
         </createIndex>
 
-        <createIndex indexName="idx_transactions_created_at"
-                    tableName="transactions">
+        <createIndex indexName="idx_transactions_created_at" tableName="transactions">
             <column name="created_at"/>
         </createIndex>
 
-        <rollback>
-            <dropTable tableName="transactions"/>
-        </rollback>
+        <createIndex indexName="idx_transactions_wallet_status" tableName="transactions">
+            <column name="wallet_id"/>
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex indexName="idx_transactions_operation_type" tableName="transactions">
+            <column name="operation_type"/>
+        </createIndex>
     </changeSet>
 
 </databaseChangeLog>
