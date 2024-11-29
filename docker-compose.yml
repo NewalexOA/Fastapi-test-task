@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   db:
     image: postgres:13
@@ -19,17 +17,19 @@ services:
       start_period: 10s
 
   liquibase:
-    image: liquibase/liquibase
+    image: liquibase/liquibase:4.25
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ./liquibase:/liquibase/changelog
-    command: --defaultsFile=/liquibase/changelog/liquibase.properties update
-    environment:
-      - LIQUIBASE_COMMAND_URL=jdbc:postgresql://db:5432/${POSTGRES_DB}
-      - LIQUIBASE_COMMAND_USERNAME=${POSTGRES_USER}
-      - LIQUIBASE_COMMAND_PASSWORD=${POSTGRES_PASSWORD}
+      - ./liquibase:/workspace
+    working_dir: /workspace
+    command: >
+      --changelog-file=changelog/changelog.xml
+      --url=jdbc:postgresql://db:5432/${POSTGRES_DB}
+      --username=${POSTGRES_USER}
+      --password=${POSTGRES_PASSWORD}
+      update
     profiles:
       - tools
 
