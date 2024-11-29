@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+
+    <changeSet id="001" author="developer" context="production" labels="schema-setup">
+        <comment>Создание таблицы кошельков</comment>
+        
+        <createTable tableName="wallets" remarks="Таблица для хранения информации о кошельках">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="balance" type="DECIMAL(18,2)" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        
+        <rollback>
+            <dropTable tableName="wallets"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="002" author="developer" context="production" labels="schema-setup">
+        <comment>Создание таблицы транзакций</comment>
+        
+        <createTable tableName="transactions" remarks="Таблица для хранения истории транзакций">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="wallet_id" type="UUID">
+                <constraints nullable="false"
+                           foreignKeyName="fk_transactions_wallet"
+                           references="wallets(id)"
+                           deleteCascade="false"/>
+            </column>
+            <column name="operation_type" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount" type="DECIMAL(18,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex indexName="idx_transactions_wallet_id"
+                    tableName="transactions">
+            <column name="wallet_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_transactions_created_at"
+                    tableName="transactions">
+            <column name="created_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="transactions"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
