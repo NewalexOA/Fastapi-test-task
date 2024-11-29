@@ -70,6 +70,10 @@
         <createIndex indexName="idx_transactions_operation_type" tableName="transactions">
             <column name="operation_type"/>
         </createIndex>
+    
+        <createIndex indexName="idx_wallets_updated_at" tableName="wallets">
+            <column name="updated_at"/>
+        </createIndex>
     </changeSet>
 
 </databaseChangeLog>

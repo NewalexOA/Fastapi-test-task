@@ -2,6 +2,9 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from pydantic_settings import BaseSettings
+from contextlib import asynccontextmanager
+import logging
+import time
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -31,3 +34,15 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             yield session
         finally:
             await session.close()
+
+@asynccontextmanager
+async def monitored_session():
+    start_time = time.monotonic()
+    session = async_session()
+    try:
+        yield session
+        duration = time.monotonic() - start_time
+        if duration > 1.0:
+            logging.warning(f"Long database transaction detected: {duration:.2f}s")
+    finally:
+        await session.close()
