@@ -5,7 +5,8 @@ from .routers import wallets
 app = FastAPI(
     title="Wallet API",
     description="API for managing wallets and transactions",
-    version="1.0.0"
+    version="1.0.0",
+    redirect_slashes=False
 )
 
 app.add_middleware(
