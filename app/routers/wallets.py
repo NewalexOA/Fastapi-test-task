@@ -33,13 +33,18 @@ async def process_operation(
     session: AsyncSession = Depends(get_session)
 ):
     """Process deposit or withdrawal operation"""
-    transaction = await update_wallet_balance(
-        session,
-        wallet_id,
-        operation.amount,
-        operation.operation_type
-    )
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-    return transaction
+    try:
+        transaction = await update_wallet_balance(
+            session,
+            wallet_id,
+            operation.amount,
+            operation.operation_type
+        )
+        if not transaction:
+            raise HTTPException(status_code=404, detail="Wallet not found")
+        return transaction
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
