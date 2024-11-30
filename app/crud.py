@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import OperationalError, InternalError
+from sqlalchemy.exc import OperationalError, InternalError, DataError
 from asyncpg.exceptions import ConnectionDoesNotExistError
 from decimal import Decimal
 from tenacity import (
@@ -54,41 +54,44 @@ async def update_wallet_balance(
     operation_type: OperationType
 ) -> Transaction:
     """Updates wallet balance and creates a transaction record"""
-    async with session.begin_nested():
-        wallet = await get_wallet_for_update(session, wallet_id)
-        if not wallet:
-            return None
+    try:
+        async with session.begin_nested():
+            wallet = await get_wallet_for_update(session, wallet_id)
+            if not wallet:
+                return None
 
-        if operation_type == OperationType.WITHDRAW and wallet.balance < amount:
+            if operation_type == OperationType.WITHDRAW and wallet.balance < amount:
+                transaction = Transaction(
+                    wallet_id=wallet.id,
+                    operation_type=operation_type,
+                    amount=amount,
+                    status=TransactionStatus.FAILED
+                )
+                session.add(transaction)
+                await session.commit()
+                raise ValueError("Insufficient funds")
+
             transaction = Transaction(
                 wallet_id=wallet.id,
                 operation_type=operation_type,
                 amount=amount,
-                status=TransactionStatus.FAILED
+                status=TransactionStatus.PENDING
             )
             session.add(transaction)
-            await session.commit()
-            raise ValueError("Insufficient funds")
-
-        transaction = Transaction(
-            wallet_id=wallet.id,
-            operation_type=operation_type,
-            amount=amount,
-            status=TransactionStatus.PENDING
-        )
-        session.add(transaction)
-        
-        try:
-            if operation_type == OperationType.DEPOSIT:
-                wallet.balance += amount
-            else:
-                wallet.balance -= amount
             
-            transaction.status = TransactionStatus.SUCCESS
-            await session.commit()
-        except Exception:
-            transaction.status = TransactionStatus.FAILED
-            await session.commit()
-            raise
+            try:
+                if operation_type == OperationType.DEPOSIT:
+                    wallet.balance += amount
+                else:
+                    wallet.balance -= amount
+                
+                transaction.status = TransactionStatus.SUCCESS
+                await session.commit()
+            except Exception:
+                transaction.status = TransactionStatus.FAILED
+                await session.commit()
+                raise
+    except DataError:
+        raise ValueError("Amount exceeds maximum allowed value")
 
     return transaction

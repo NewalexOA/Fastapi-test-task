@@ -4,6 +4,7 @@ from uuid import UUID
 from ..database import get_session
 from ..crud import create_wallet, get_wallet, update_wallet_balance
 from ..schemas import TransactionCreate
+import logging
 
 router = APIRouter()
 
@@ -45,6 +46,7 @@ async def process_operation(
         return transaction
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
+    except Exception as e:
+        logging.exception("Error processing operation")
         raise HTTPException(status_code=500, detail="Internal server error")
 
