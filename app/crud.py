@@ -1,6 +1,8 @@
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import OperationalError, InternalError
+from asyncpg.exceptions import ConnectionDoesNotExistError
 from decimal import Decimal
 from tenacity import (
     retry,
@@ -41,7 +43,9 @@ async def get_wallet_for_update(session: AsyncSession, wallet_id: UUID) -> Walle
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=0.1, min=0.2, max=1),
-    retry=retry_if_exception_type(Exception)
+    retry=retry_if_exception_type((OperationalError, InternalError, ConnectionDoesNotExistError)),
+    retry_error_callback=lambda retry_state: retry_state.outcome.result(),
+    reraise=True
 )
 async def update_wallet_balance(
     session: AsyncSession, 
@@ -56,6 +60,14 @@ async def update_wallet_balance(
             return None
 
         if operation_type == OperationType.WITHDRAW and wallet.balance < amount:
+            transaction = Transaction(
+                wallet_id=wallet.id,
+                operation_type=operation_type,
+                amount=amount,
+                status=TransactionStatus.FAILED
+            )
+            session.add(transaction)
+            await session.commit()
             raise ValueError("Insufficient funds")
 
         transaction = Transaction(
@@ -73,9 +85,10 @@ async def update_wallet_balance(
                 wallet.balance -= amount
             
             transaction.status = TransactionStatus.SUCCESS
+            await session.commit()
         except Exception:
             transaction.status = TransactionStatus.FAILED
+            await session.commit()
             raise
 
-    await session.commit()
     return transaction

@@ -53,6 +53,7 @@ services:
       - LIQUIBASE_COMMAND_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - ./liquibase:/liquibase
+      - ./app:/app/app
     restart: unless-stopped
     deploy:
       resources:
