@@ -16,10 +16,12 @@ class WalletResponse(WalletBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        json_encoders = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={
             Decimal: lambda v: f"{float(v):.2f}"
         }
+    )
 
 class TransactionBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
