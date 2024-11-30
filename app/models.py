@@ -4,7 +4,6 @@ from enum import Enum
 from sqlalchemy import Column, DateTime, Enum as SQLEnum, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from .database import Base
-from sqlalchemy import event
 from sqlalchemy.orm import mapped_column
 
 class TransactionStatus(str, Enum):

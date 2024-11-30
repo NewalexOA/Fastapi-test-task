@@ -16,7 +16,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(wallets.router, prefix="/api/v1", tags=["wallets"])
+app.include_router(
+    wallets.router,
+    prefix="/api/v1/wallets",
+    tags=["wallets"]
+)
 
 @app.get("/health")
 async def health_check():
