@@ -7,6 +7,7 @@ from app.database import Base
 TEST_DATABASE_URL = "postgresql+asyncpg://wallet_user:wallet_password@db:5432/wallet_db_test"
 
 @pytest.fixture(scope="session")
+@pytest.mark.asyncio(scope="session")
 def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop

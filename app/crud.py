@@ -1,8 +1,8 @@
 from uuid import UUID
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import OperationalError, InternalError, DataError
-from asyncpg.exceptions import ConnectionDoesNotExistError
+from asyncpg.exceptions import ConnectionDoesNotExistError, LockNotAvailableError
 from decimal import Decimal
 from tenacity import (
     retry,
@@ -35,63 +35,69 @@ async def get_wallet_for_update(session: AsyncSession, wallet_id: UUID) -> Walle
     query = (
         select(Wallet)
         .where(Wallet.id == wallet_id)
-        .with_for_update()  # Add row-level lock
+        .with_for_update(skip_locked=True)
     )
     result = await session.execute(query)
     return result.scalar_one_or_none()
 
 @retry(
     stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=0.1, min=0.2, max=1),
-    retry=retry_if_exception_type((OperationalError, InternalError, ConnectionDoesNotExistError)),
-    retry_error_callback=lambda retry_state: retry_state.outcome.result(),
-    reraise=True
+    wait=wait_exponential(multiplier=0.1),
+    retry=retry_if_exception_type((OperationalError, ConnectionDoesNotExistError))
 )
 async def update_wallet_balance(
-    session: AsyncSession, 
+    session: AsyncSession,
     wallet_id: UUID,
     amount: Decimal,
     operation_type: OperationType
-) -> Transaction:
-    """Updates wallet balance and creates a transaction record"""
+) -> Transaction | None:
+    """Updates wallet balance and creates transaction record"""
     try:
-        async with session.begin_nested():
-            wallet = await get_wallet_for_update(session, wallet_id)
+        async with session.begin():
+            # Сначала получаем блокировку на кошелек
+            query = (
+                select(Wallet)
+                .where(Wallet.id == wallet_id)
+                .with_for_update()
+            )
+            
+            wallet = await session.execute(query)
+            wallet = wallet.scalar_one_or_none()
+            
             if not wallet:
                 return None
 
-            if operation_type == OperationType.WITHDRAW and wallet.balance < amount:
-                transaction = Transaction(
-                    wallet_id=wallet.id,
-                    operation_type=operation_type,
-                    amount=amount,
-                    status=TransactionStatus.FAILED
+            # Проверяем наличие успешной транзакции снятия под блокировкой
+            if operation_type == OperationType.WITHDRAW:
+                existing_transaction = await session.execute(
+                    select(Transaction)
+                    .where(
+                        Transaction.wallet_id == wallet_id,
+                        Transaction.operation_type == OperationType.WITHDRAW,
+                        Transaction.status == TransactionStatus.SUCCESS
+                    )
                 )
-                session.add(transaction)
-                await session.commit()
+                if existing_transaction.scalar_one_or_none():
+                    return None
+
+            if operation_type == OperationType.WITHDRAW and wallet.balance < amount:
                 raise ValueError("Insufficient funds")
 
+            if operation_type == OperationType.DEPOSIT:
+                wallet.balance += amount
+            else:
+                wallet.balance -= amount
+
             transaction = Transaction(
-                wallet_id=wallet.id,
+                wallet_id=wallet_id,
                 operation_type=operation_type,
                 amount=amount,
-                status=TransactionStatus.PENDING
+                status=TransactionStatus.SUCCESS
             )
             session.add(transaction)
             
-            try:
-                if operation_type == OperationType.DEPOSIT:
-                    wallet.balance += amount
-                else:
-                    wallet.balance -= amount
-                
-                transaction.status = TransactionStatus.SUCCESS
-                await session.commit()
-            except Exception:
-                transaction.status = TransactionStatus.FAILED
-                await session.commit()
-                raise
-    except DataError:
-        raise ValueError("Amount exceeds maximum allowed value")
-
-    return transaction
+            return transaction
+            
+    except Exception as e:
+        await session.rollback()
+        raise

@@ -5,6 +5,8 @@ from ..database import get_session
 from ..crud import create_wallet, get_wallet, update_wallet_balance
 from ..schemas import TransactionCreate, WalletResponse, TransactionResponse
 import logging
+from sqlalchemy.exc import DataError, OperationalError
+from asyncpg.exceptions import LockNotAvailableError
 
 router = APIRouter()
 
@@ -37,10 +39,19 @@ async def process_operation(
             operation.operation_type
         )
         if not transaction:
-            raise HTTPException(status_code=404, detail="Wallet not found")
+            raise HTTPException(
+                status_code=409,
+                detail="Operation cannot be processed right now, please try again"
+            )
         return transaction
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except DataError:
+        raise HTTPException(status_code=400, detail="Invalid data format")
+    except OperationalError:
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
+    except LockNotAvailableError:
+        raise HTTPException(status_code=409, detail="Resource is locked by another operation")
     except Exception as e:
         logging.exception("Error processing operation")
         raise HTTPException(status_code=500, detail="Internal server error")
