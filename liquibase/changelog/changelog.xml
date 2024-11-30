@@ -8,6 +8,12 @@
     <changeSet id="001" author="developer" context="production">
         <comment>Initial database setup</comment>
         
+        <!-- Create ENUM types -->
+        <sql>
+            CREATE TYPE operationtype AS ENUM ('DEPOSIT', 'WITHDRAW');
+            CREATE TYPE transactionstatus AS ENUM ('PENDING', 'SUCCESS', 'FAILED');
+        </sql>
+        
         <!-- Wallets table -->
         <createTable tableName="wallets" remarks="Table for storing wallet information">
             <column name="id" type="UUID">
@@ -35,13 +41,13 @@
                            references="wallets(id)"
                            deleteCascade="false"/>
             </column>
-            <column name="operation_type" type="VARCHAR(10)">
+            <column name="operation_type" type="operationtype">
                 <constraints nullable="false"/>
             </column>
             <column name="amount" type="DECIMAL(18,2)">
                 <constraints nullable="false"/>
             </column>
-            <column name="status" type="VARCHAR(20)" defaultValue="PENDING">
+            <column name="status" type="transactionstatus" defaultValue="PENDING">
                 <constraints nullable="false"/>
             </column>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
@@ -69,6 +75,10 @@
 
         <createIndex indexName="idx_transactions_operation_type" tableName="transactions">
             <column name="operation_type"/>
+        </createIndex>
+    
+        <createIndex indexName="idx_wallets_updated_at" tableName="wallets">
+            <column name="updated_at"/>
         </createIndex>
     </changeSet>
 

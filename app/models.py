@@ -4,6 +4,7 @@ from enum import Enum
 from sqlalchemy import Column, DateTime, Enum as SQLEnum, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from .database import Base
+from sqlalchemy.orm import mapped_column
 
 class TransactionStatus(str, Enum):
     PENDING = "PENDING"
@@ -20,7 +21,12 @@ class Wallet(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     balance = Column(Numeric(18, 2), nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC)
+    )
 
 class Transaction(Base):
     __tablename__ = "transactions"

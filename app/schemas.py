@@ -21,7 +21,7 @@ class TransactionBase(BaseModel):
 
 class TransactionCreate(TransactionBase):
     operation_type: OperationType
-    amount: Decimal = Field(gt=0)
+    amount: Decimal = Field(gt=0, le=Decimal('9999999999999999.99'))
 
 class TransactionResponse(TransactionBase):
     id: UUID
