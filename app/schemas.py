@@ -12,9 +12,14 @@ class WalletCreate(WalletBase):
 
 class WalletResponse(WalletBase):
     id: UUID
-    balance: Decimal
+    balance: Decimal = Field(decimal_places=2)
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        json_encoders = {
+            Decimal: lambda v: f"{float(v):.2f}"
+        }
 
 class TransactionBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)

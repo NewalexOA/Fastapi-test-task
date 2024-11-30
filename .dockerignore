@@ -4,4 +4,3 @@ __pycache__
 .git
 .gitignore
 .pytest_cache
-tests/ 

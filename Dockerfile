@@ -27,10 +27,16 @@ COPY . .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-# Создаем непривилегированного пользователя и даем ему права на entrypoint.sh
+# Создаем непривилегированного пользователя и даем ему права
 RUN adduser --disabled-password --gecos '' appuser && \
-    chown appuser:appuser entrypoint.sh
+    chown -R appuser:appuser /app && \
+    mkdir -p /app/.pytest_cache && \
+    chown -R appuser:appuser /app/.pytest_cache
 
 USER appuser
 
+# Добавляем PYTHONPATH
+ENV PYTHONPATH=/app
+
 CMD ["./entrypoint.sh"]
+

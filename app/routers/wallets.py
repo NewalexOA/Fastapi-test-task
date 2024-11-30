@@ -3,23 +3,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from ..database import get_session
 from ..crud import create_wallet, get_wallet, update_wallet_balance
-from ..schemas import TransactionCreate
+from ..schemas import TransactionCreate, WalletResponse, TransactionResponse
 import logging
 
 router = APIRouter()
 
-@router.get("/health")
-async def wallet_health():
-    """Health check endpoint for wallet service"""
-    return {"status": "ok"}
-
-@router.post("/")
+@router.post("/", response_model=WalletResponse)
 async def create_new_wallet(session: AsyncSession = Depends(get_session)):
     """Create a new wallet with zero balance"""
     wallet = await create_wallet(session)
     return wallet
 
-@router.get("/{wallet_id}")
+@router.get("/{wallet_id}", response_model=WalletResponse)
 async def get_wallet_info(wallet_id: UUID, session: AsyncSession = Depends(get_session)):
     """Get wallet information"""
     wallet = await get_wallet(session, wallet_id)
@@ -27,7 +22,7 @@ async def get_wallet_info(wallet_id: UUID, session: AsyncSession = Depends(get_s
         raise HTTPException(status_code=404, detail="Wallet not found")
     return wallet
 
-@router.post("/{wallet_id}/operation")
+@router.post("/{wallet_id}/operation", response_model=TransactionResponse)
 async def process_operation(
     wallet_id: UUID,
     operation: TransactionCreate,
