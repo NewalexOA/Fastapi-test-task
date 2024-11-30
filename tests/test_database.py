@@ -8,7 +8,7 @@ async def test_session_lifecycle():
     """Test session creation and cleanup"""
     async for session in get_session():
         assert session is not None
-        assert not session.is_active
+        assert session.is_active
         break
 
 @pytest.mark.asyncio

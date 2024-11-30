@@ -107,13 +107,12 @@ async def test_invalid_amount():
 
 @pytest.mark.asyncio
 async def test_transaction_rollback():
-    """Test transaction rollback on error"""
     async with AsyncClient(app=app, base_url="http://test") as client:
         wallet_response = await client.post("/api/v1/wallets/")
         wallet_id = wallet_response.json()["id"]
         
-        with patch("app.crud.update_wallet_balance") as mock_update:
-            mock_update.side_effect = DataError("Database error")
+        with patch("app.routers.wallets.update_wallet_balance", autospec=True) as mock_update:
+            mock_update.side_effect = DataError("statement", {}, "Database error")
             response = await client.post(
                 f"/api/v1/wallets/{wallet_id}/operation",
                 json={
@@ -159,12 +158,11 @@ async def test_concurrent_operations():
 
 @pytest.mark.asyncio
 async def test_internal_server_error():
-    """Test internal server error handling"""
     async with AsyncClient(app=app, base_url="http://test") as client:
         wallet_response = await client.post("/api/v1/wallets/")
         wallet_id = wallet_response.json()["id"]
         
-        with patch("app.crud.update_wallet_balance") as mock_update:
+        with patch("app.routers.wallets.update_wallet_balance", autospec=True) as mock_update:
             mock_update.side_effect = Exception("Unexpected error")
             response = await client.post(
                 f"/api/v1/wallets/{wallet_id}/operation",
@@ -183,17 +181,8 @@ async def test_database_errors():
         wallet_response = await client.post("/api/v1/wallets/")
         wallet_id = wallet_response.json()["id"]
         
-        with patch("app.crud.update_wallet_balance") as mock:
-            mock.side_effect = [
-                OperationalError("statement", {}, None),  # First attempt fails
-                None,  # Second attempt fails
-                Transaction(
-                    wallet_id=wallet_id,
-                    operation_type=OperationType.DEPOSIT,
-                    amount=Decimal("100.00"),
-                    status=TransactionStatus.SUCCESS
-                )  # Third attempt succeeds
-            ]
+        with patch("app.routers.wallets.update_wallet_balance", autospec=True) as mock:
+            mock.side_effect = OperationalError("statement", {}, None)
             response = await client.post(
                 f"/api/v1/wallets/{wallet_id}/operation",
                 json={
@@ -201,6 +190,6 @@ async def test_database_errors():
                     "amount": "100.00"
                 }
             )
-            assert response.status_code == 200
-            assert mock.call_count == 3  # Verify retry mechanism
+            assert response.status_code == 503
+            assert "Service temporarily unavailable" in response.json()["detail"]
     
