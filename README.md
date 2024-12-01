@@ -7,22 +7,23 @@ RESTful API service for managing digital wallets with support for deposits and w
 
 ## Features
 - Async PostgreSQL with connection pooling
-- Concurrent transaction safety
+- Concurrent transaction safety with row-level locking
 - Automatic retry mechanism
-- Transaction monitoring
+- Transaction monitoring and logging
 - Database migrations with Liquibase
-- Comprehensive test coverage
+- Comprehensive test coverage with async testing
 - Decimal precision for financial operations
 - Input validation and error handling
 
 ## Technical Details
 - FastAPI framework for high performance
-- SQLAlchemy with async support
-- PgBouncer for connection pooling
+- SQLAlchemy with async support and row-level locking
+- PgBouncer for connection pooling in transaction mode
 - Pydantic for data validation
 - Liquibase for database versioning
 - PostgreSQL for ACID compliance
 - Docker for containerization
+- pytest-asyncio for async testing
 
 ## API Endpoints
 - `POST /api/v1/wallets/` - Create new wallet
@@ -38,22 +39,20 @@ RESTful API service for managing digital wallets with support for deposits and w
 ## Testing
 Run tests with coverage report:
 ```bash
+# Run all tests with coverage
 docker-compose exec app pytest tests/ -v --cov=app --cov-report=term-missing
+# Run specific test file
+docker-compose exec app pytest tests/test_wallets.py -v
+# Run tests with specific marker
+docker-compose exec app pytest -m "asyncio" tests/
 ```
-
-## Load Testing
-Run load tests:
-```bash
-# Start load test with web interface
-docker-compose up locust
-# Access web interface at http://localhost:8089
-```
-
-Monitor performance:
-- RPS (Requests per second)
-- Response time percentiles
-- Error rate
-- Database connection pool usage
+## Test Database
+Tests use a separate database with:
+- Automatic creation/cleanup
+- Transaction isolation
+- Concurrent operation testing
+- Row-level locking verification
+- Connection pool stress testing
 
 ## Performance Monitoring
 Monitor system performance during load tests:
@@ -61,6 +60,7 @@ Monitor system performance during load tests:
 - Connection pools: Check pool usage in application logs
 - System resources: Use `htop` or similar tools
 - Response times: Monitor through Locust UI
+- Transaction duration: Check application logs
 
 ## API Documentation
 Available at http://localhost:8000/docs
@@ -70,6 +70,7 @@ Available at http://localhost:8000/docs
 - 404 - Wallet not found
 - 422 - Validation error (e.g., negative amount)
 - 500 - Internal server error
+- 503 - Service temporarily unavailable (database connection issues)
 
 ## PgBouncer Monitoring
 Monitor connection pooling:
@@ -82,6 +83,8 @@ SHOW STATS;
 SHOW SERVERS;
 -- Current connections
 SHOW CLIENTS;
+-- Transaction status
+SHOW TOTALS;
 ```
 
 ## Connection Pooling
@@ -90,3 +93,11 @@ The service uses PgBouncer for connection pooling with:
 - Dynamic user authentication
 - Connection limits and timeouts
 - Monitoring capabilities
+- Automatic connection cleanup
+
+## Development
+- Use `pytest.mark.asyncio` for async tests
+- Implement proper cleanup in test fixtures
+- Use row-level locking for concurrent operations
+- Monitor transaction duration
+- Handle database connection errors gracefully

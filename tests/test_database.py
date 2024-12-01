@@ -5,6 +5,10 @@ from sqlalchemy.sql import text
 from sqlalchemy.exc import OperationalError
 import asyncio
 from uuid import uuid4
+from sqlalchemy.ext.asyncio import create_async_engine
+
+# Глобальная настройка для всех тестов в файле
+pytestmark = pytest.mark.asyncio
 
 @pytest.mark.asyncio
 async def test_session_lifecycle():
@@ -26,9 +30,9 @@ async def test_long_transaction_monitoring():
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("create_tables")
-async def test_database_indexes(engine):
+async def test_database_indexes(test_db):
     """Test that required indexes exist"""
-    async with engine.connect() as conn:
+    async with test_db.connect() as conn:
         result = await conn.execute(text("""
             SELECT indexname 
             FROM pg_indexes 
