@@ -116,12 +116,13 @@ services:
         condition: service_healthy
     command: >
       /bin/sh -c "
+      cp /generate-userlist.sh.ro /generate-userlist.sh &&
       chmod +x /generate-userlist.sh &&
       /generate-userlist.sh &&
       pgbouncer /etc/pgbouncer/pgbouncer.ini"
     volumes:
       - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-      - ./pgbouncer/generate-userlist.sh:/generate-userlist.sh:ro
+      - ./pgbouncer/generate-userlist.sh:/generate-userlist.sh.ro:ro
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 6432"]
       interval: 10s
