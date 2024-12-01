@@ -184,10 +184,6 @@ async def test_database_errors():
                     "amount": "100.00"
                 }
             )
-<<<<<<< Updated upstream
-            assert response.status_code == 503
-            assert "Service temporarily unavailable" in response.json()["detail"]
-=======
             assert response.status_code == 200
             assert response.json()["status"] == "FAILED"
 
@@ -209,5 +205,4 @@ async def test_service_unavailable():
             )
             assert response.status_code == 200
             assert response.json()["status"] == "FAILED"
->>>>>>> Stashed changes
     
