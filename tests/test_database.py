@@ -1,5 +1,5 @@
 import pytest
-from app.database import get_session, monitored_session
+from app.database import get_session, monitored_session, get_engine
 from unittest.mock import patch
 from sqlalchemy.sql import text
 from sqlalchemy.exc import OperationalError
@@ -78,3 +78,11 @@ async def test_concurrent_operations():
         # Only successful operations should have modified the balance
         successful_ops = len([r for r in results if r])
         assert final_balance == 100 - (successful_ops * 10)
+
+@pytest.mark.asyncio
+async def test_database_connection():
+    """Test that database connection works with PgBouncer"""
+    engine = get_engine()
+    async with engine.connect() as conn:
+        result = await conn.execute(text("SELECT 1"))
+        assert await result.scalar() == 1
