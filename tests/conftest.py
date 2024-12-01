@@ -17,18 +17,15 @@ def event_loop():
 
 @pytest.fixture(scope="session")
 def engine():
-    # Parse existing URL to add required parameters
     url = urlparse(TEST_DATABASE_URL)
     query = parse_qs(url.query)
     
-    # Add required parameters for pgbouncer compatibility
     query.update({
         "prepared_statement_cache_size": ["0"],
         "statement_cache_size": ["0"],
-        "server_settings": ["{'statement_timeout': '60000'}", "{'idle_in_transaction_session_timeout': '60000'}"]
+        "server_settings": ["{'application_name': 'test_app'}"]
     })
     
-    # Reconstruct URL with new parameters
     new_url = urlunparse((
         url.scheme, url.netloc, url.path, url.params,
         urlencode(query, doseq=True), url.fragment

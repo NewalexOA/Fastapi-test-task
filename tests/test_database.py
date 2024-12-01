@@ -4,6 +4,7 @@ from unittest.mock import patch
 from sqlalchemy.sql import text
 from sqlalchemy.exc import OperationalError
 import asyncio
+from uuid import uuid4
 
 @pytest.mark.asyncio
 async def test_session_lifecycle():
@@ -40,9 +41,10 @@ async def test_concurrent_operations():
     """Test handling of concurrent operations"""
     async for session in get_session():
         # Create test wallet
+        wallet_id = str(uuid4())
         result = await session.execute(
             text("INSERT INTO wallets (id, balance) VALUES (:id, :balance) RETURNING id"),
-            {"id": "test-wallet", "balance": 100}
+            {"id": wallet_id, "balance": 100}
         )
         await session.commit()
         
@@ -57,7 +59,7 @@ async def test_concurrent_operations():
                             WHERE id = :id
                             AND balance >= :amount
                         """),
-                        {"id": "test-wallet", "amount": -10}
+                        {"id": wallet_id, "amount": -10}
                     )
                     await inner_session.commit()
                 except OperationalError:
@@ -71,7 +73,7 @@ async def test_concurrent_operations():
         # Verify final balance
         result = await session.execute(
             text("SELECT balance FROM wallets WHERE id = :id"),
-            {"id": "test-wallet"}
+            {"id": wallet_id}
         )
         final_balance = result.scalar()
         
@@ -85,7 +87,8 @@ async def test_database_connection():
     engine = get_engine()
     async with engine.connect() as conn:
         result = await conn.execute(text("SELECT 1"))
-        assert await result.scalar() == 1
+        row = await result.first()
+        assert row[0] == 1
 
 @pytest.mark.asyncio
 async def test_pgbouncer_connection():

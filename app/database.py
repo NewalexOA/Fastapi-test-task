@@ -5,14 +5,14 @@ Handles database connection settings, session management, and connection pooling
 
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base
 from pydantic_settings import BaseSettings
 from contextlib import asynccontextmanager
 import logging
 import time
 import os
-from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from sqlalchemy.pool import NullPool
+
 
 class Settings(BaseSettings):
     """
