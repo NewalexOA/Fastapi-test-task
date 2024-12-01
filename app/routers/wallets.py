@@ -5,11 +5,11 @@ from ..database import get_session
 from ..crud import create_wallet, get_wallet, update_wallet_balance
 from ..schemas import TransactionCreate, WalletResponse, TransactionResponse, TransactionStatus
 import logging
-from sqlalchemy.exc import DataError, OperationalError
-from asyncpg.exceptions import LockNotAvailableError
-import asyncio
+from asyncpg.exceptions import TooManyConnectionsError
 from datetime import datetime
 from uuid import uuid4
+import traceback
+from sqlalchemy.exc import OperationalError
 
 router = APIRouter()
 
@@ -34,11 +34,8 @@ async def process_operation(
     session: AsyncSession = Depends(get_session)
 ):
     try:
-        updated_wallet, amount = await update_wallet_balance(
-            wallet_id=wallet_id,
-            amount=operation.amount,
-            operation_type=operation.operation_type,
-            session=session
+        _, amount = await update_wallet_balance(
+            session, wallet_id, operation.operation_type, operation.amount
         )
         
         return TransactionResponse(
@@ -49,13 +46,15 @@ async def process_operation(
             status=TransactionStatus.SUCCESS,
             created_at=datetime.utcnow()
         )
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        logging.error(f"Unexpected error in process_operation: {str(e)}", exc_info=True)
-        await session.rollback()
+    except HTTPException as http_ex:
+        raise http_ex
+    except (TooManyConnectionsError, OperationalError):
         raise HTTPException(
-            status_code=500, 
-            detail="Internal server error. Please try again later."
+            status_code=503,
+            detail="Service temporarily unavailable. Please try again later."
         )
-
+    except Exception as e:
+        logging.error(f"Unexpected error in process_operation: {str(e)}")
+        logging.error(traceback.format_exc())
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")

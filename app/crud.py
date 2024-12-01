@@ -2,7 +2,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import OperationalError
-from asyncpg.exceptions import ConnectionDoesNotExistError
+from asyncpg.exceptions import ConnectionDoesNotExistError, TooManyConnectionsError
 from decimal import Decimal
 from tenacity import (
     retry,
@@ -11,8 +11,9 @@ from tenacity import (
     retry_if_exception_type
 )
 from fastapi import HTTPException
-import asyncio
 from sqlalchemy.exc import SQLAlchemyError
+from typing import Tuple
+import logging
 
 from .models import Wallet, OperationType
 
@@ -49,31 +50,43 @@ async def get_wallet_for_update(session: AsyncSession, wallet_id: UUID) -> Walle
     retry=retry_if_exception_type((OperationalError, ConnectionDoesNotExistError))
 )
 async def update_wallet_balance(
+    session: AsyncSession, 
     wallet_id: UUID,
-    amount: Decimal,
     operation_type: OperationType,
-    session: AsyncSession,
-    max_retries: int = 3
-) -> tuple[Wallet, Decimal]:
-    for attempt in range(max_retries):
-        try:
-            wallet = await session.get(Wallet, wallet_id)
-            if not wallet:
-                raise HTTPException(status_code=404, detail="Wallet not found")
-                
-            new_balance = wallet.balance + amount if operation_type == OperationType.DEPOSIT else wallet.balance - amount
+    amount: Decimal
+) -> Tuple[Wallet, Decimal]:
+    try:
+        wallet = await session.get(Wallet, wallet_id)
+        if not wallet:
+            raise HTTPException(status_code=404, detail="Wallet not found")
             
-            if new_balance < 0:
-                raise HTTPException(status_code=400, 
-                                  detail="Insufficient funds or operation cannot be processed")
-                
-            wallet.balance = new_balance
-            await session.commit()
-            return wallet, amount
+        new_balance = wallet.balance + amount if operation_type == OperationType.DEPOSIT else wallet.balance - amount
+        
+        if new_balance < 0:
+            raise HTTPException(status_code=400, 
+                              detail="Insufficient funds or operation cannot be processed")
             
-        except SQLAlchemyError:
-            await session.rollback()
-            if attempt == max_retries - 1:
-                raise HTTPException(status_code=503, 
-                                  detail="Service temporarily unavailable")
-            await asyncio.sleep(0.1 * (attempt + 1))
+        wallet.balance = new_balance
+        await session.commit()
+        return wallet, amount
+        
+    except TooManyConnectionsError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable. Please try again later."
+        )
+    except OperationalError as e:
+        await session.rollback()
+        logging.error(f"Database operational error: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable due to database error"
+        )
+    except SQLAlchemyError as e:
+        await session.rollback()
+        logging.error(f"Database error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
