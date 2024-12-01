@@ -17,26 +17,14 @@ def event_loop():
 
 @pytest.fixture(scope="session")
 def engine():
-    url = urlparse(TEST_DATABASE_URL)
-    query = parse_qs(url.query)
-    
-    query.update({
-        "prepared_statement_cache_size": ["0"],
-        "statement_cache_size": ["0"],
-        "server_settings": ["{'application_name': 'test_app'}"]
-    })
-    
-    new_url = urlunparse((
-        url.scheme, url.netloc, url.path, url.params,
-        urlencode(query, doseq=True), url.fragment
-    ))
-    
+    """Create test database engine with proper settings"""
     return create_async_engine(
-        new_url,
-        poolclass=NullPool,
+        TEST_DATABASE_URL,
         echo=True,
-        execution_options={
-            "isolation_level": "READ COMMITTED"
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+            "max_cached_statement_lifetime": 0
         }
     )
 

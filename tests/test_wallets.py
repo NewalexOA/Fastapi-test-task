@@ -124,16 +124,14 @@ async def test_transaction_rollback():
 @pytest.mark.asyncio
 async def test_concurrent_operations():
     async with AsyncClient(app=app, base_url="http://test") as client:
-        # Создаем кошелек и делаем начальный депозит
         wallet_response = await client.post("/api/v1/wallets/")
         wallet_id = wallet_response.json()["id"]
         
         await client.post(
             f"/api/v1/wallets/{wallet_id}/operation",
-            json={"operation_type": "DEPOSIT", "amount": "100.00"}
+            json={"operation_type": "DEPOSIT", "amount": "150.00"}
         )
         
-        # Добавляем задержку между операциями
         async def withdraw():
             await asyncio.sleep(random.uniform(0.1, 0.3))
             return await client.post(
@@ -147,7 +145,10 @@ async def test_concurrent_operations():
         )
         
         success_count = sum(1 for r in responses if getattr(r, 'status_code', None) == 200)
-        assert success_count == 2  # Должно пройти только 2 снятия (100/50 = 2)
+        assert success_count == 2
+        
+        wallet = await client.get(f"/api/v1/wallets/{wallet_id}")
+        assert wallet.json()["balance"] == "50.00"
 
 @pytest.mark.asyncio
 async def test_internal_server_error():

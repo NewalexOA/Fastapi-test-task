@@ -17,15 +17,21 @@ class WalletUser(HttpUser):
     @task(3)
     def get_wallet(self):
         # Reading wallet (light operation)
-        self.client.get(f"/wallets/{self.wallet_id}")
+        self.client.get(f"/api/v1/wallets/{self.wallet_id}")
     
     @task(1)
     def create_wallet(self):
         # Creating wallet (medium operation)
-        self.client.post("/wallets/")
+        self.client.post("/api/v1/wallets/")
     
     @task(2)
     def deposit(self):
         # Deposit (heavy operation)
-        self.client.post(f"/wallets/{self.wallet_id}/operation",
-            json={"operation_type": "DEPOSIT", "amount": "100.00"})
+        amount = f"{random.uniform(1.0, 100.0):.2f}"  # Добавим случайные суммы
+        self.client.post(
+            f"/api/v1/wallets/{self.wallet_id}/operation",
+            json={
+                "operation_type": "DEPOSIT",
+                "amount": amount
+            }
+        )
