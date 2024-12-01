@@ -29,10 +29,11 @@ async def test_long_transaction_monitoring():
         # Check that warning was logged
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("create_tables")
+@pytest.mark.usefixtures("setup_test_db")
 async def test_database_indexes(test_db):
     """Test that required indexes exist"""
-    async with test_db.connect() as conn:
+    engine = await anext(test_db)  # Получаем engine из генератора
+    async with engine.connect() as conn:
         result = await conn.execute(text("""
             SELECT indexname 
             FROM pg_indexes 
@@ -40,6 +41,7 @@ async def test_database_indexes(test_db):
         """))
         indexes = [row[0] for row in result.fetchall()]
         assert "idx_wallets_balance" in indexes
+        assert "idx_wallets_balance_ops" in indexes  # Проверяем также индекс из changeSet 002
 
 @pytest.mark.asyncio
 async def test_concurrent_operations():

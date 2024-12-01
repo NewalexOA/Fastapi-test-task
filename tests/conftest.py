@@ -23,34 +23,45 @@ async def db_engine():
         "postgresql+asyncpg://wallet_user:wallet_password@db:5432/postgres",
         isolation_level="AUTOCOMMIT"
     )
-    yield engine
-    await engine.dispose()
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
 
 @pytest.fixture(scope="session")
 async def test_db(db_engine):
     """Create test database."""
-    async with db_engine.connect() as conn:
+    engine = await anext(db_engine)  # Получаем engine из генератора
+    async with engine.connect() as conn:
         await conn.execute(text("DROP DATABASE IF EXISTS wallet_db_test"))
         await conn.execute(text("CREATE DATABASE wallet_db_test"))
-        await conn.execute(text("""
-            GRANT ALL PRIVILEGES ON DATABASE wallet_db_test TO wallet_user;
-            ALTER DATABASE wallet_db_test OWNER TO wallet_user;
-        """))
+        await conn.execute(text("GRANT ALL PRIVILEGES ON DATABASE wallet_db_test TO wallet_user"))
+        await conn.execute(text("ALTER DATABASE wallet_db_test OWNER TO wallet_user"))
     
     test_engine = create_async_engine(
-        "postgresql+asyncpg://wallet_user:wallet_password@db:5432/wallet_db_test"
+        "postgresql+asyncpg://wallet_user:wallet_password@db:5432/wallet_db_test",
+        isolation_level="SERIALIZABLE"
     )
     
-    async with test_engine.begin() as conn:
+    try:
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_wallets_balance ON wallets (balance)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_wallets_balance_ops ON wallets USING btree (id, balance)"))
+        yield test_engine
+    finally:
+        await test_engine.dispose()
+        async with engine.connect() as conn:
+            await conn.execute(text("DROP DATABASE IF EXISTS wallet_db_test"))
+
+@pytest.fixture(autouse=True)
+async def setup_test_db(test_db):
+    """Setup test database before each test."""
+    async with test_db.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
-    yield test_engine
-    
-    await test_engine.dispose()
-    
-    # Cleanup
-    async with db_engine.connect() as conn:
-        await conn.execute(text("DROP DATABASE IF EXISTS wallet_db_test"))
+    yield
+    async with test_db.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 @pytest.fixture
 async def session(test_db):
