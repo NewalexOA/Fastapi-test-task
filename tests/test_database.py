@@ -2,8 +2,6 @@ import pytest
 from app.database import get_session, monitored_session
 from unittest.mock import patch
 from sqlalchemy.sql import text
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import OperationalError
 import asyncio
 

@@ -53,6 +53,9 @@
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
                 <constraints nullable="false"/>
             </column>
+            <column name="deleted_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
         </createTable>
 
         <!-- Transactions table -->
@@ -104,9 +107,11 @@
     <changeSet id="002" author="developer" runInTransaction="false">
         <sql>
             CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_wallets_balance_ops 
-            ON wallets USING btree (id, balance) 
-            WHERE deleted_at IS NULL;
+            ON wallets USING btree (id, balance);
         </sql>
+        <rollback>
+            DROP INDEX IF EXISTS idx_wallets_balance_ops;
+        </rollback>
     </changeSet>
 
 </databaseChangeLog>
