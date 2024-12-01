@@ -41,11 +41,11 @@ def get_engine():
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
         "server_settings": {
-            "application_name": "wallet_service"
+            "application_name": "wallet_service",
+            "statement_cache_size": "0",
+            "prepared_statement_cache_size": "0"
         }
     }
-    
-    logging.debug(f"Connection arguments: {connect_args}")
     
     engine = create_async_engine(
         settings.DATABASE_URL,

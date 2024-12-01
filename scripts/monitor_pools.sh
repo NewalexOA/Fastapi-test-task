@@ -14,6 +14,12 @@ while true; do
     SHOW CLIENTS;
     \echo === SERVERS ===
     SHOW SERVERS;
+    \echo === TRANSACTIONS ===
+    SHOW TOTALS;
+    \echo === AVERAGES ===
+    SHOW STATS_AVERAGES;
+    \echo === STATE ===
+    SHOW STATE;
 EOF
     
     echo "==================="
