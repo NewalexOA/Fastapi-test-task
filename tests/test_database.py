@@ -86,3 +86,17 @@ async def test_database_connection():
     async with engine.connect() as conn:
         result = await conn.execute(text("SELECT 1"))
         assert await result.scalar() == 1
+
+@pytest.mark.asyncio
+async def test_pgbouncer_connection():
+    """Test that connection works properly with PgBouncer"""
+    engine = get_engine()
+    async with engine.connect() as conn:
+        # Test basic query
+        result = await conn.execute(text("SELECT 1"))
+        assert await result.scalar() == 1
+        
+        # Test transaction
+        async with conn.begin():
+            result = await conn.execute(text("SELECT 1"))
+            assert await result.scalar() == 1

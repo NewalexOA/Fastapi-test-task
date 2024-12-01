@@ -116,6 +116,19 @@ services:
       timeout: 5s
       retries: 5
 
+  pgbouncer-monitor:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./scripts:/scripts
+    command: ["/bin/bash", "/scripts/monitor_pools.sh"]
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      - pgbouncer
+
 volumes:
   postgres_data:
     name: ${COMPOSE_PROJECT_NAME}_db_data

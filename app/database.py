@@ -41,8 +41,7 @@ def get_engine():
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
         "server_settings": {
-            "statement_timeout": "60000",
-            "idle_in_transaction_session_timeout": "60000"
+            "application_name": "wallet_service"
         }
     }
     
@@ -53,7 +52,10 @@ def get_engine():
         poolclass=NullPool,
         echo=settings.DB_ECHO,
         connect_args=connect_args,
-        execution_options={"isolation_level": "READ COMMITTED"}
+        execution_options={
+            "isolation_level": "READ COMMITTED",
+            "prepared_statement": False
+        }
     )
     
     return engine
