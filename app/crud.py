@@ -49,15 +49,15 @@ async def get_wallet_for_update(session: AsyncSession, wallet_id: UUID) -> Walle
     retry=retry_if_exception_type((OperationalError, ConnectionDoesNotExistError))
 )
 async def update_wallet_balance(
-    session: AsyncSession,
     wallet_id: UUID,
     amount: Decimal,
     operation_type: OperationType,
+    session: AsyncSession,
     max_retries: int = 3
-) -> Wallet:
+) -> tuple[Wallet, Decimal]:
     for attempt in range(max_retries):
         try:
-            wallet = await get_wallet_for_update(session, wallet_id)
+            wallet = await session.get(Wallet, wallet_id)
             if not wallet:
                 raise HTTPException(status_code=404, detail="Wallet not found")
                 
@@ -69,7 +69,7 @@ async def update_wallet_balance(
                 
             wallet.balance = new_balance
             await session.commit()
-            return wallet
+            return wallet, amount
             
         except SQLAlchemyError:
             await session.rollback()
