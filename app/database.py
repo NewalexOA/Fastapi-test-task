@@ -47,7 +47,10 @@ def get_engine():
     query.update({
         "prepared_statement_cache_size": ["0"],
         "statement_cache_size": ["0"],
-        "server_settings": ["{'statement_timeout': '60000'}", "{'idle_in_transaction_session_timeout': '60000'}"]
+        "server_settings": ["{'statement_timeout': '60000'}", "{'idle_in_transaction_session_timeout': '60000'}"],
+        "command_timeout": ["60"],
+        "max_cached_statement_lifetime": ["0"],
+        "max_cacheable_statement_size": ["0"]
     })
     
     # Reconstruct URL with new parameters
@@ -62,6 +65,13 @@ def get_engine():
         echo=settings.DB_ECHO,
         execution_options={
             "isolation_level": "READ COMMITTED"
+        },
+        connect_args={
+            "server_settings": {
+                "statement_timeout": "60000",
+                "idle_in_transaction_session_timeout": "60000"
+            },
+            "command_timeout": 60
         }
     )
 
