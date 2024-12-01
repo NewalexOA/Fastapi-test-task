@@ -1,8 +1,8 @@
 from uuid import UUID
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import OperationalError, InternalError, DataError
-from asyncpg.exceptions import ConnectionDoesNotExistError, LockNotAvailableError
+from sqlalchemy.exc import OperationalError
+from asyncpg.exceptions import ConnectionDoesNotExistError, TooManyConnectionsError
 from decimal import Decimal
 from tenacity import (
     retry,
@@ -10,8 +10,12 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type
 )
+from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
+from typing import Tuple
+import logging
 
-from .models import Wallet, Transaction, TransactionStatus, OperationType
+from .models import Wallet, OperationType
 
 async def create_wallet(session: AsyncSession) -> Wallet:
     """Creates a new wallet with zero balance"""
@@ -46,58 +50,43 @@ async def get_wallet_for_update(session: AsyncSession, wallet_id: UUID) -> Walle
     retry=retry_if_exception_type((OperationalError, ConnectionDoesNotExistError))
 )
 async def update_wallet_balance(
-    session: AsyncSession,
+    session: AsyncSession, 
     wallet_id: UUID,
-    amount: Decimal,
-    operation_type: OperationType
-) -> Transaction | None:
-    """Updates wallet balance and creates transaction record"""
+    operation_type: OperationType,
+    amount: Decimal
+) -> Tuple[Wallet, Decimal]:
     try:
-        async with session.begin():
-            # Сначала получаем блокировку на кошелек
-            query = (
-                select(Wallet)
-                .where(Wallet.id == wallet_id)
-                .with_for_update()
-            )
+        wallet = await session.get(Wallet, wallet_id)
+        if not wallet:
+            raise HTTPException(status_code=404, detail="Wallet not found")
             
-            wallet = await session.execute(query)
-            wallet = wallet.scalar_one_or_none()
+        new_balance = wallet.balance + amount if operation_type == OperationType.DEPOSIT else wallet.balance - amount
+        
+        if new_balance < 0:
+            raise HTTPException(status_code=400, 
+                              detail="Insufficient funds or operation cannot be processed")
             
-            if not wallet:
-                return None
-
-            # Проверяем наличие успешной транзакции снятия под блокировкой
-            if operation_type == OperationType.WITHDRAW:
-                existing_transaction = await session.execute(
-                    select(Transaction)
-                    .where(
-                        Transaction.wallet_id == wallet_id,
-                        Transaction.operation_type == OperationType.WITHDRAW,
-                        Transaction.status == TransactionStatus.SUCCESS
-                    )
-                )
-                if existing_transaction.scalar_one_or_none():
-                    return None
-
-            if operation_type == OperationType.WITHDRAW and wallet.balance < amount:
-                raise ValueError("Insufficient funds")
-
-            if operation_type == OperationType.DEPOSIT:
-                wallet.balance += amount
-            else:
-                wallet.balance -= amount
-
-            transaction = Transaction(
-                wallet_id=wallet_id,
-                operation_type=operation_type,
-                amount=amount,
-                status=TransactionStatus.SUCCESS
-            )
-            session.add(transaction)
-            
-            return transaction
-            
-    except Exception as e:
+        wallet.balance = new_balance
+        await session.commit()
+        return wallet, amount
+        
+    except TooManyConnectionsError:
         await session.rollback()
-        raise
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable. Please try again later."
+        )
+    except OperationalError as e:
+        await session.rollback()
+        logging.error(f"Database operational error: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable due to database error"
+        )
+    except SQLAlchemyError as e:
+        await session.rollback()
+        logging.error(f"Database error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )

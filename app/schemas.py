@@ -3,6 +3,7 @@ from decimal import Decimal
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 from .models import OperationType, TransactionStatus
+from enum import Enum
 
 class WalletBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -37,3 +38,8 @@ class TransactionResponse(TransactionBase):
     amount: Decimal
     status: TransactionStatus
     created_at: datetime
+
+class TransactionStatus(str, Enum):
+    PENDING = "PENDING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"

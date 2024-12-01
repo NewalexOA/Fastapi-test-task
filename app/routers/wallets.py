@@ -3,10 +3,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from ..database import get_session
 from ..crud import create_wallet, get_wallet, update_wallet_balance
-from ..schemas import TransactionCreate, WalletResponse, TransactionResponse
+from ..schemas import TransactionCreate, WalletResponse, TransactionResponse, TransactionStatus
 import logging
-from sqlalchemy.exc import DataError, OperationalError
-from asyncpg.exceptions import LockNotAvailableError
+from asyncpg.exceptions import TooManyConnectionsError
+from datetime import datetime
+from uuid import uuid4
+import traceback
+from sqlalchemy.exc import OperationalError
 
 router = APIRouter()
 
@@ -30,29 +33,28 @@ async def process_operation(
     operation: TransactionCreate,
     session: AsyncSession = Depends(get_session)
 ):
-    """Process deposit or withdrawal operation"""
     try:
-        transaction = await update_wallet_balance(
-            session,
-            wallet_id,
-            operation.amount,
-            operation.operation_type
+        _, amount = await update_wallet_balance(
+            session, wallet_id, operation.operation_type, operation.amount
         )
-        if not transaction:
-            raise HTTPException(
-                status_code=409,
-                detail="Operation cannot be processed right now, please try again"
-            )
-        return transaction
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except DataError:
-        raise HTTPException(status_code=400, detail="Invalid data format")
-    except OperationalError:
-        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
-    except LockNotAvailableError:
-        raise HTTPException(status_code=409, detail="Resource is locked by another operation")
+        
+        return TransactionResponse(
+            id=uuid4(),
+            wallet_id=wallet_id,
+            amount=amount,
+            operation_type=operation.operation_type,
+            status=TransactionStatus.SUCCESS,
+            created_at=datetime.utcnow()
+        )
+    except HTTPException as http_ex:
+        raise http_ex
+    except (TooManyConnectionsError, OperationalError):
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable. Please try again later."
+        )
     except Exception as e:
-        logging.exception("Error processing operation")
+        logging.error(f"Unexpected error in process_operation: {str(e)}")
+        logging.error(traceback.format_exc())
+        await session.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
-

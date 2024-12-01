@@ -11,3 +11,4 @@ pytest-cov==6.0.0
 httpx==0.26.0
 python-dotenv==1.0.1
 tenacity==8.2.3
+locust==2.24.0

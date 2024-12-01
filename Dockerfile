@@ -2,40 +2,42 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Установка зависимостей для psycopg2 и Liquibase
+# Installation of dependencies for psycopg2 and Liquibase
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     libpq-dev \
     default-jre \
     wget \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Установка Liquibase
+# Installation of Liquibase
 RUN wget -O /usr/local/bin/liquibase.tar.gz https://github.com/liquibase/liquibase/releases/download/v4.25.1/liquibase-4.25.1.tar.gz \
     && cd /usr/local/bin \
     && tar -xf liquibase.tar.gz \
     && rm liquibase.tar.gz \
     && chmod +x /usr/local/bin/liquibase
 
-# Копируем requirements.txt отдельно для кэширования слоя с зависимостями
+# Copying requirements.txt separately for caching the layer with dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем код приложения и entrypoint
+# Copying the application code and entrypoint
 COPY . .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-# Создаем непривилегированного пользователя и даем ему права
+# Creating a non-privileged user and giving him rights
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app && \
     mkdir -p /app/.pytest_cache && \
-    chown -R appuser:appuser /app/.pytest_cache
+    chown -R appuser:appuser /app/.pytest_cache && \
+    chmod 777 /tmp
 
 USER appuser
 
-# Добавляем PYTHONPATH
+# Adding PYTHONPATH
 ENV PYTHONPATH=/app
 
 CMD ["./entrypoint.sh"]
