@@ -7,6 +7,7 @@ from ..schemas import TransactionCreate, WalletResponse, TransactionResponse
 import logging
 from sqlalchemy.exc import DataError, OperationalError
 from asyncpg.exceptions import LockNotAvailableError
+import asyncio
 
 router = APIRouter()
 
@@ -31,28 +32,47 @@ async def process_operation(
     session: AsyncSession = Depends(get_session)
 ):
     """Process deposit or withdrawal operation"""
-    try:
-        transaction = await update_wallet_balance(
-            session,
-            wallet_id,
-            operation.amount,
-            operation.operation_type
-        )
-        if not transaction:
-            raise HTTPException(
-                status_code=409,
-                detail="Operation cannot be processed right now, please try again"
+    for attempt in range(3):
+        try:
+            transaction = await update_wallet_balance(
+                session,
+                wallet_id,
+                operation.amount,
+                operation.operation_type
             )
-        return transaction
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except DataError:
-        raise HTTPException(status_code=400, detail="Invalid data format")
-    except OperationalError:
-        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
-    except LockNotAvailableError:
-        raise HTTPException(status_code=409, detail="Resource is locked by another operation")
-    except Exception as e:
-        logging.exception("Error processing operation")
-        raise HTTPException(status_code=500, detail="Internal server error")
+            if not transaction:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Insufficient funds or operation cannot be processed"
+                )
+            return transaction
+        except OperationalError as e:
+            logging.error(f"Database operational error: {str(e)}")
+            await session.rollback()
+            if attempt == 2:
+                raise HTTPException(
+                    status_code=503, 
+                    detail="Service temporarily unavailable"
+                )
+            await asyncio.sleep(0.1 * (attempt + 1))
+        except LockNotAvailableError as e:
+            logging.error(f"Lock acquisition failed: {str(e)}")
+            await session.rollback()
+            if attempt == 2:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Service temporarily unavailable due to lock contention"
+                )
+            await asyncio.sleep(0.1 * (attempt + 1))
+        except DataError as e:
+            logging.error(f"Data error: {str(e)}")
+            await session.rollback()
+            raise HTTPException(status_code=400, detail="Invalid operation data")
+        except Exception as e:
+            logging.error(f"Unexpected error in process_operation: {str(e)}", exc_info=True)
+            await session.rollback()
+            raise HTTPException(
+                status_code=500, 
+                detail="Internal server error. Please try again later."
+            )
 
