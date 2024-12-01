@@ -6,7 +6,7 @@ from ..crud import create_wallet, get_wallet, update_wallet_balance
 from ..schemas import TransactionCreate, WalletResponse, TransactionResponse, TransactionStatus
 import logging
 from asyncpg.exceptions import TooManyConnectionsError
-from datetime import datetime
+from datetime import datetime, UTC
 from uuid import uuid4
 import traceback
 from sqlalchemy.exc import OperationalError
@@ -44,7 +44,7 @@ async def process_operation(
             amount=amount,
             operation_type=operation.operation_type,
             status=TransactionStatus.SUCCESS,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
     except HTTPException as http_ex:
         raise http_ex
