@@ -40,6 +40,26 @@ Run tests with coverage report:
 docker-compose exec app pytest tests/ -v --cov=app --cov-report=term-missing
 ```
 
+## Load Testing
+Run load tests:
+```bash
+# Start load test with web interface
+docker-compose up locust
+# Access web interface at http://localhost:8089
+```
+
+Monitor performance:
+- RPS (Requests per second)
+- Response time percentiles
+- Error rate
+- Database connection pool usage
+
+## Performance Monitoring
+Monitor system performance during load tests:
+- Database connections: `SELECT count(*) FROM pg_stat_activity;`
+- Connection pools: Check pool usage in application logs
+- System resources: Use `htop` or similar tools
+- Response times: Monitor through Locust UI
 
 ## API Documentation
 Available at http://localhost:8000/docs
