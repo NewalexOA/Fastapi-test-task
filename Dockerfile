@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     default-jre \
     wget \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Установка Liquibase
@@ -31,7 +32,8 @@ RUN chmod +x entrypoint.sh
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app && \
     mkdir -p /app/.pytest_cache && \
-    chown -R appuser:appuser /app/.pytest_cache
+    chown -R appuser:appuser /app/.pytest_cache && \
+    chmod 777 /tmp
 
 USER appuser
 
