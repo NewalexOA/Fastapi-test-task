@@ -1,8 +1,8 @@
 from uuid import UUID
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import OperationalError, InternalError, DataError
-from asyncpg.exceptions import ConnectionDoesNotExistError, LockNotAvailableError
+from sqlalchemy.exc import OperationalError
+from asyncpg.exceptions import ConnectionDoesNotExistError
 from decimal import Decimal
 from tenacity import (
     retry,
@@ -54,7 +54,7 @@ async def update_wallet_balance(
     """Updates wallet balance and creates transaction record"""
     try:
         async with session.begin():
-            # Сначала получаем блокировку на кошелек
+            # First acquire lock on the wallet
             query = (
                 select(Wallet)
                 .where(Wallet.id == wallet_id)
@@ -67,7 +67,7 @@ async def update_wallet_balance(
             if not wallet:
                 return None
 
-            # Проверяем наличие успешной транзакции снятия под блокировкой
+            # Check for an existing successful withdrawal transaction under the lock
             if operation_type == OperationType.WITHDRAW:
                 existing_transaction = await session.execute(
                     select(Transaction)
