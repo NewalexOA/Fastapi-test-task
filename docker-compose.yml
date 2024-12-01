@@ -111,7 +111,7 @@ services:
       - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - pgbouncer_data:/etc/pgbouncer
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 6432"]
+      test: ["CMD-SHELL", "PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -p 6432 -U ${POSTGRES_USER} -d pgbouncer -c '\\q'"]
       interval: 10s
       timeout: 5s
       retries: 5

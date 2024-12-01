@@ -10,6 +10,8 @@ while true; do
     PGPASSWORD=${POSTGRES_PASSWORD} psql -h pgbouncer -p 6432 -U ${POSTGRES_USER} -d pgbouncer -c "SHOW SERVERS;"
     echo "=== STATS ==="
     PGPASSWORD=${POSTGRES_PASSWORD} psql -h pgbouncer -p 6432 -U ${POSTGRES_USER} -d pgbouncer -c "SHOW STATS;"
+    echo "=== LISTS ==="
+    PGPASSWORD=${POSTGRES_PASSWORD} psql -h pgbouncer -p 6432 -U ${POSTGRES_USER} -d pgbouncer -c "SHOW LISTS;"
     echo "==================="
     sleep 5
 done 
