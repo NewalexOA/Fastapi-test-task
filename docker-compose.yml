@@ -98,7 +98,9 @@ services:
       - app
 
   pgbouncer:
-    image: edoburu/pgbouncer
+    build:
+      context: ./pgbouncer
+      dockerfile: Dockerfile
     environment:
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
@@ -107,6 +109,8 @@ services:
       - POOL_MODE=transaction
       - MAX_CLIENT_CONN=1000
       - DEFAULT_POOL_SIZE=20
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
       - "6432:6432"
     networks:
@@ -114,21 +118,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: >
-      /bin/sh -c "
-      apt-get update && apt-get install -y dos2unix &&
-      ls -la /generate-userlist.sh.ro &&
-      mkdir -p /tmp/pgbouncer &&
-      cp -v /generate-userlist.sh.ro /tmp/pgbouncer/generate-userlist.sh &&
-      ls -la /tmp/pgbouncer &&
-      chmod +x /tmp/pgbouncer/generate-userlist.sh &&
-      dos2unix /tmp/pgbouncer/generate-userlist.sh &&
-      cat /tmp/pgbouncer/generate-userlist.sh &&
-      /tmp/pgbouncer/generate-userlist.sh &&
-      pgbouncer /etc/pgbouncer/pgbouncer.ini"
     volumes:
       - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-      - ./pgbouncer/generate-userlist.sh:/generate-userlist.sh.ro:ro
       - pgbouncer_data:/etc/pgbouncer
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 6432"]
