@@ -33,4 +33,4 @@ fi
 echo "Migrations completed - starting application"
 
 cd /app
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 8 --loop uvloop --http httptools 
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 12 --loop uvloop --http httptools --backlog 2048 --limit-concurrency 400 
