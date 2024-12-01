@@ -7,6 +7,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf
     ports:
       - "${POSTGRES_PORT}:5432"
     healthcheck:
@@ -15,6 +17,15 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: '4G'
+        reservations:
+          cpus: '2'
+          memory: '2G'
 
   liquibase:
     image: liquibase/liquibase:4.25
@@ -26,12 +37,13 @@ services:
     working_dir: /workspace
     command: >
       --changelog-file=changelog/changelog.xml
-      --url=jdbc:postgresql://db:5432/${POSTGRES_DB}
-      --username=${POSTGRES_USER}
-      --password=${POSTGRES_PASSWORD}
+      --labels="!test"
+      --defaultsFile=/workspace/liquibase.properties
       update
-    profiles:
-      - tools
+    environment:
+      - LIQUIBASE_COMMAND_USERNAME=${POSTGRES_USER}
+      - LIQUIBASE_COMMAND_PASSWORD=${POSTGRES_PASSWORD}
+      - LIQUIBASE_COMMAND_URL=jdbc:postgresql://db:5432/${POSTGRES_DB}
 
   app:
     build: 
@@ -42,6 +54,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      liquibase:
+        condition: service_completed_successfully
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - PYTHONUNBUFFERED=1
@@ -51,6 +65,7 @@ services:
       - LIQUIBASE_COMMAND_URL=jdbc:postgresql://db:5432/${POSTGRES_DB}
       - LIQUIBASE_COMMAND_USERNAME=${POSTGRES_USER}
       - LIQUIBASE_COMMAND_PASSWORD=${POSTGRES_PASSWORD}
+      - WAIT_FOR_MIGRATIONS=true
     volumes:
       - ./liquibase:/liquibase
       - ./app:/app/app
@@ -69,6 +84,16 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+
+  locust:
+    image: locustio/locust
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./tests:/mnt/locust
+    command: -f /mnt/locust/locustfile.py --host http://app:8000/api/v1
+    depends_on:
+      - app
 
 volumes:
   postgres_data:
