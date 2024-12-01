@@ -18,6 +18,7 @@ RESTful API service for managing digital wallets with support for deposits and w
 ## Technical Details
 - FastAPI framework for high performance
 - SQLAlchemy with async support
+- PgBouncer for connection pooling
 - Pydantic for data validation
 - Liquibase for database versioning
 - PostgreSQL for ACID compliance
@@ -82,3 +83,10 @@ SHOW SERVERS;
 -- Current connections
 SHOW CLIENTS;
 ```
+
+## Connection Pooling
+The service uses PgBouncer for connection pooling with:
+- Transaction pooling mode
+- Dynamic user authentication
+- Connection limits and timeouts
+- Monitoring capabilities

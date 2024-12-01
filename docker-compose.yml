@@ -107,7 +107,18 @@ services:
       - POOL_MODE=transaction
       - MAX_CLIENT_CONN=1000
       - DEFAULT_POOL_SIZE=20
-    command: sh -c "/generate-userlist.sh && pgbouncer /etc/pgbouncer/pgbouncer.ini"
+    ports:
+      - "6432:6432"
+    networks:
+      - default
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      /bin/sh -c "
+      chmod +x /generate-userlist.sh &&
+      /generate-userlist.sh &&
+      pgbouncer /etc/pgbouncer/pgbouncer.ini"
     volumes:
       - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ./pgbouncer/generate-userlist.sh:/generate-userlist.sh:ro

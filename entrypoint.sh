@@ -1,14 +1,22 @@
 #!/bin/bash
 
-# Ждем доступности базы данных
-until PGPASSWORD=${POSTGRES_PASSWORD} psql -h pgbouncer -p 6432 -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c '\q'; do
-  echo "Postgres is unavailable - sleeping"
+# Ждем доступности базы данных через pgbouncer
+until PGPASSWORD=${POSTGRES_PASSWORD} psql -h db -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c '\q'; do
+  echo "PostgreSQL is unavailable - sleeping"
   sleep 1
 done
 
-echo "Postgres is up - executing migrations"
+echo "PostgreSQL is up - checking pgbouncer"
 
-# Запускаем миграции
+# Проверяем доступность pgbouncer
+until PGPASSWORD=${POSTGRES_PASSWORD} psql -h pgbouncer -p 6432 -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c '\q'; do
+  echo "PgBouncer is unavailable - sleeping"
+  sleep 1
+done
+
+echo "PgBouncer is up - executing migrations"
+
+# Запускаем миграции напрямую через PostgreSQL
 cd /liquibase
 liquibase \
   --changelog-file=changelog/changelog.xml \
@@ -17,18 +25,17 @@ liquibase \
   --password=${POSTGRES_PASSWORD} \
   update
 
-# Проверяем успешность миграций через запрос к БД
+# Проверяем успешность миграций
 until PGPASSWORD=${POSTGRES_PASSWORD} psql -h db -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c "SELECT count(*) FROM public.databasechangeloglock;" > /dev/null 2>&1; do
   echo "Waiting for migrations to complete..."
   sleep 2
 done
 
-# Дополнительная проверка, что все миграции применены
-PGPASSWORD=${POSTGRES_PASSWORD} psql -h db -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c "SELECT count(*) FROM public.databasechangelog;" > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-  echo "Migration tables not found"
-  exit 1
-fi
+# Проверяем доступность PgBouncer после миграций
+until PGPASSWORD=${POSTGRES_PASSWORD} psql -h pgbouncer -p 6432 -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c '\q'; do
+  echo "PgBouncer is not ready - waiting..."
+  sleep 1
+done
 
 echo "Migrations completed - starting application"
 
