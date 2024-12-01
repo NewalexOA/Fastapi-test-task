@@ -116,13 +116,20 @@ services:
         condition: service_healthy
     command: >
       /bin/sh -c "
-      cp /generate-userlist.sh.ro /generate-userlist.sh &&
-      chmod +x /generate-userlist.sh &&
-      /generate-userlist.sh &&
+      apt-get update && apt-get install -y dos2unix &&
+      ls -la /generate-userlist.sh.ro &&
+      mkdir -p /tmp/pgbouncer &&
+      cp -v /generate-userlist.sh.ro /tmp/pgbouncer/generate-userlist.sh &&
+      ls -la /tmp/pgbouncer &&
+      chmod +x /tmp/pgbouncer/generate-userlist.sh &&
+      dos2unix /tmp/pgbouncer/generate-userlist.sh &&
+      cat /tmp/pgbouncer/generate-userlist.sh &&
+      /tmp/pgbouncer/generate-userlist.sh &&
       pgbouncer /etc/pgbouncer/pgbouncer.ini"
     volumes:
       - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ./pgbouncer/generate-userlist.sh:/generate-userlist.sh.ro:ro
+      - pgbouncer_data:/etc/pgbouncer
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 6432"]
       interval: 10s
@@ -132,6 +139,8 @@ services:
 volumes:
   postgres_data:
     name: ${COMPOSE_PROJECT_NAME}_db_data
+  pgbouncer_data:
+    name: ${COMPOSE_PROJECT_NAME}_pgbouncer_data
 
 networks:
   default:
