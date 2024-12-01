@@ -33,46 +33,23 @@ settings = Settings()
 
 def get_engine():
     """
-    Creates database engine with proper configuration for pgbouncer.
-    When using PgBouncer, we should:
-    1. Use NullPool as connection pooling is handled by PgBouncer
-    2. Disable prepared statements and statement cache
-    3. Set proper isolation level
+    Creates SQLAlchemy engine with proper configuration for PgBouncer
     """
-    # Parse existing URL to add required parameters
-    url = urlparse(settings.DATABASE_URL)
-    query = parse_qs(url.query)
-    
-    # Add required parameters for pgbouncer compatibility
-    query.update({
-        "prepared_statement_cache_size": ["0"],
-        "statement_cache_size": ["0"],
-        "server_settings": ["{'statement_timeout': '60000'}", "{'idle_in_transaction_session_timeout': '60000'}"],
-        "command_timeout": ["60"],
-        "max_cached_statement_lifetime": ["0"],
-        "max_cacheable_statement_size": ["0"]
-    })
-    
-    # Reconstruct URL with new parameters
-    new_url = urlunparse((
-        url.scheme, url.netloc, url.path, url.params,
-        urlencode(query, doseq=True), url.fragment
-    ))
+    connect_args = {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+        "server_settings": {
+            "statement_timeout": 60000,
+            "idle_in_transaction_session_timeout": 60000
+        }
+    }
     
     return create_async_engine(
-        new_url,
-        poolclass=NullPool,  # Use NullPool with PgBouncer
+        settings.DATABASE_URL,
+        poolclass=NullPool,  # Используем NullPool с PgBouncer
         echo=settings.DB_ECHO,
-        execution_options={
-            "isolation_level": "READ COMMITTED"
-        },
-        connect_args={
-            "server_settings": {
-                "statement_timeout": "60000",
-                "idle_in_transaction_session_timeout": "60000"
-            },
-            "command_timeout": 60
-        }
+        connect_args=connect_args,
+        execution_options={"isolation_level": "READ COMMITTED"}
     )
 
 async_session = async_sessionmaker(
