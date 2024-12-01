@@ -127,10 +127,10 @@ async def test_concurrent_operations():
         wallet_response = await client.post("/api/v1/wallets/")
         wallet_id = wallet_response.json()["id"]
         
-        # Начальный депозит
+        # Initial deposit
         await client.post(
             f"/api/v1/wallets/{wallet_id}/operation",
-            json={"operation_type": "DEPOSIT", "amount": "100.00"}  # Уменьшаем начальный депозит
+            json={"operation_type": "DEPOSIT", "amount": "100.00"}
         )
         
         async def withdraw():
@@ -146,9 +146,9 @@ async def test_concurrent_operations():
         )
         
         success_count = sum(1 for r in responses if getattr(r, 'status_code', None) == 200)
-        assert success_count == 2  # Теперь должно быть 2 успешных снятия
+        assert success_count == 2  # Only 2 withdrawals should succeed (100/50 = 2)
         
-        # Проверяем финальный баланс
+        # Verify final balance
         wallet = await client.get(f"/api/v1/wallets/{wallet_id}")
         assert wallet.json()["balance"] == "0.00"  # 100 - (2 * 50) = 0
 
