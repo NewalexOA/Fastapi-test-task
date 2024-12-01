@@ -10,8 +10,11 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type
 )
+from fastapi import HTTPException
+import asyncio
+from sqlalchemy.exc import SQLAlchemyError
 
-from .models import Wallet, Transaction, TransactionStatus, OperationType
+from .models import Wallet, OperationType
 
 async def create_wallet(session: AsyncSession) -> Wallet:
     """Creates a new wallet with zero balance"""
@@ -49,55 +52,28 @@ async def update_wallet_balance(
     session: AsyncSession,
     wallet_id: UUID,
     amount: Decimal,
-    operation_type: OperationType
-) -> Transaction | None:
-    """Updates wallet balance and creates transaction record"""
-    try:
-        async with session.begin():
-            # First acquire lock on the wallet
-            query = (
-                select(Wallet)
-                .where(Wallet.id == wallet_id)
-                .with_for_update()
-            )
-            
-            wallet = await session.execute(query)
-            wallet = wallet.scalar_one_or_none()
-            
+    operation_type: OperationType,
+    max_retries: int = 3
+) -> Wallet:
+    for attempt in range(max_retries):
+        try:
+            wallet = await get_wallet_for_update(session, wallet_id)
             if not wallet:
-                return None
-
-            # Check for an existing successful withdrawal transaction under the lock
-            if operation_type == OperationType.WITHDRAW:
-                existing_transaction = await session.execute(
-                    select(Transaction)
-                    .where(
-                        Transaction.wallet_id == wallet_id,
-                        Transaction.operation_type == OperationType.WITHDRAW,
-                        Transaction.status == TransactionStatus.SUCCESS
-                    )
-                )
-                if existing_transaction.scalar_one_or_none():
-                    return None
-
-            if operation_type == OperationType.WITHDRAW and wallet.balance < amount:
-                raise ValueError("Insufficient funds")
-
-            if operation_type == OperationType.DEPOSIT:
-                wallet.balance += amount
-            else:
-                wallet.balance -= amount
-
-            transaction = Transaction(
-                wallet_id=wallet_id,
-                operation_type=operation_type,
-                amount=amount,
-                status=TransactionStatus.SUCCESS
-            )
-            session.add(transaction)
+                raise HTTPException(status_code=404, detail="Wallet not found")
+                
+            new_balance = wallet.balance + amount if operation_type == OperationType.DEPOSIT else wallet.balance - amount
             
-            return transaction
+            if new_balance < 0:
+                raise HTTPException(status_code=400, 
+                                  detail="Insufficient funds or operation cannot be processed")
+                
+            wallet.balance = new_balance
+            await session.commit()
+            return wallet
             
-    except Exception:
-        await session.rollback()
-        raise
+        except SQLAlchemyError:
+            await session.rollback()
+            if attempt == max_retries - 1:
+                raise HTTPException(status_code=503, 
+                                  detail="Service temporarily unavailable")
+            await asyncio.sleep(0.1 * (attempt + 1))
