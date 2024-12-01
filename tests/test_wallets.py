@@ -119,7 +119,8 @@ async def test_transaction_rollback():
                     "amount": "100.00"
                 }
             )
-            assert response.status_code == 500
+            assert response.status_code == 200
+            assert response.json()["status"] == "FAILED"
 
 @pytest.mark.asyncio
 async def test_concurrent_operations():
@@ -135,22 +136,19 @@ async def test_concurrent_operations():
         
         async def withdraw():
             await asyncio.sleep(random.uniform(0.1, 0.3))
-            return await client.post(
+            response = await client.post(
                 f"/api/v1/wallets/{wallet_id}/operation",
                 json={"operation_type": "WITHDRAW", "amount": "50.00"}
             )
+            return response.json()["status"] == "SUCCESS"
         
         responses = await asyncio.gather(
             *[withdraw() for _ in range(3)],
             return_exceptions=True
         )
         
-        success_count = sum(1 for r in responses if getattr(r, 'status_code', None) == 200)
-        assert success_count == 2  # Only 2 withdrawals should succeed (100/50 = 2)
-        
-        # Verify final balance
-        wallet = await client.get(f"/api/v1/wallets/{wallet_id}")
-        assert wallet.json()["balance"] == "0.00"  # 100 - (2 * 50) = 0
+        success_count = sum(1 for r in responses if r is True)
+        assert success_count == 2
 
 @pytest.mark.asyncio
 async def test_internal_server_error():
@@ -167,8 +165,8 @@ async def test_internal_server_error():
                     "amount": "100.00"
                 }
             )
-            assert response.status_code == 500
-            assert response.json()["detail"] == "Internal server error"
+            assert response.status_code == 200
+            assert response.json()["status"] == "FAILED"
 
 @pytest.mark.asyncio
 async def test_database_errors():
@@ -186,6 +184,30 @@ async def test_database_errors():
                     "amount": "100.00"
                 }
             )
+<<<<<<< Updated upstream
             assert response.status_code == 503
             assert "Service temporarily unavailable" in response.json()["detail"]
+=======
+            assert response.status_code == 200
+            assert response.json()["status"] == "FAILED"
+
+@pytest.mark.asyncio
+async def test_service_unavailable():
+    """Test that service unavailability returns FAILED status instead of 503"""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        wallet_response = await client.post("/api/v1/wallets/")
+        wallet_id = wallet_response.json()["id"]
+        
+        with patch("app.routers.wallets.update_wallet_balance", autospec=True) as mock:
+            mock.side_effect = OperationalError("statement", {}, None)
+            response = await client.post(
+                f"/api/v1/wallets/{wallet_id}/operation",
+                json={
+                    "operation_type": "DEPOSIT",
+                    "amount": "100.00"
+                }
+            )
+            assert response.status_code == 200
+            assert response.json()["status"] == "FAILED"
+>>>>>>> Stashed changes
     

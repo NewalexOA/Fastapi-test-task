@@ -69,8 +69,8 @@ Available at http://localhost:8000/docs
 - 400 - Bad Request (e.g., insufficient funds)
 - 404 - Wallet not found
 - 422 - Validation error (e.g., negative amount)
-- 500 - Internal server error
-- 503 - Service temporarily unavailable (database connection issues)
+
+All other errors return 200 OK with operation status "FAILED" and details in the response body.
 
 ## PgBouncer Monitoring
 Monitor connection pooling:
