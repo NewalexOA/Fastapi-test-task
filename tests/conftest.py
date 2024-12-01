@@ -9,14 +9,6 @@ from sqlalchemy.sql import text
 pytest_plugins = ('pytest_asyncio',)
 
 @pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for each test case."""
-    policy = asyncio.get_event_loop_policy()
-    loop = policy.new_event_loop()
-    yield loop
-    loop.close()
-
-@pytest.fixture(scope="session")
 async def db_engine():
     """Create a test database engine."""
     engine = create_async_engine(
@@ -71,4 +63,12 @@ async def session(test_db):
     )
     async with async_session() as session:
         yield session
-        await session.rollback() 
+        await session.rollback()
+
+@pytest.mark.asyncio_mode("strict")
+def pytest_configure(config):
+    """Configure pytest-asyncio mode."""
+    config.addinivalue_line(
+        "markers",
+        "asyncio: mark test as async"
+    ) 
