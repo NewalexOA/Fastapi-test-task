@@ -30,15 +30,43 @@ class Settings(BaseSettings):
         env_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
 
 settings = Settings()
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    poolclass=NullPool,
-    echo=settings.DB_ECHO,
-    execution_options={"isolation_level": "READ COMMITTED"},
-)
+
+def get_engine():
+    """
+    Creates database engine with proper configuration for pgbouncer.
+    When using PgBouncer, we should:
+    1. Use NullPool as connection pooling is handled by PgBouncer
+    2. Disable prepared statements and statement cache
+    3. Set proper isolation level
+    """
+    # Parse existing URL to add required parameters
+    url = urlparse(settings.DATABASE_URL)
+    query = parse_qs(url.query)
+    
+    # Add required parameters for pgbouncer compatibility
+    query.update({
+        "prepared_statement_cache_size": ["0"],
+        "statement_cache_size": ["0"],
+        "server_settings": ["{'statement_timeout': '60000'}", "{'idle_in_transaction_session_timeout': '60000'}"]
+    })
+    
+    # Reconstruct URL with new parameters
+    new_url = urlunparse((
+        url.scheme, url.netloc, url.path, url.params,
+        urlencode(query, doseq=True), url.fragment
+    ))
+    
+    return create_async_engine(
+        new_url,
+        poolclass=NullPool,  # Use NullPool with PgBouncer
+        echo=settings.DB_ECHO,
+        execution_options={
+            "isolation_level": "READ COMMITTED"
+        }
+    )
 
 async_session = async_sessionmaker(
-    engine,
+    get_engine(),
     class_=AsyncSession,
     expire_on_commit=False
 )
