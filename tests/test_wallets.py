@@ -5,8 +5,6 @@ from app.main import app
 from unittest.mock import patch
 import asyncio
 from sqlalchemy.exc import DataError, OperationalError
-from app.models import Transaction, TransactionStatus, OperationType
-from decimal import Decimal
 
 @pytest.mark.asyncio
 async def test_create_wallet():
