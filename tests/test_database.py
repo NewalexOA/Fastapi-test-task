@@ -2,6 +2,10 @@ import pytest
 from app.database import get_session, monitored_session
 from unittest.mock import patch
 from sqlalchemy.sql import text
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import OperationalError
+import asyncio
 
 @pytest.mark.asyncio
 async def test_session_lifecycle():
@@ -32,3 +36,47 @@ async def test_database_indexes(engine):
         """))
         indexes = [row[0] for row in result]
         assert "idx_wallets_balance" in indexes
+
+@pytest.mark.asyncio
+async def test_concurrent_operations():
+    """Test handling of concurrent operations"""
+    async for session in get_session():
+        # Create test wallet
+        result = await session.execute(
+            text("INSERT INTO wallets (id, balance) VALUES (:id, :balance) RETURNING id"),
+            {"id": "test-wallet", "balance": 100}
+        )
+        await session.commit()
+        
+        # Simulate concurrent operations
+        async def update_balance():
+            async for inner_session in get_session():
+                try:
+                    await inner_session.execute(
+                        text("""
+                            UPDATE wallets 
+                            SET balance = balance + :amount 
+                            WHERE id = :id
+                            AND balance >= :amount
+                        """),
+                        {"id": "test-wallet", "amount": -10}
+                    )
+                    await inner_session.commit()
+                except OperationalError:
+                    await inner_session.rollback()
+                    return False
+                return True
+
+        # Run concurrent updates
+        results = await asyncio.gather(*[update_balance() for _ in range(5)])
+        
+        # Verify final balance
+        result = await session.execute(
+            text("SELECT balance FROM wallets WHERE id = :id"),
+            {"id": "test-wallet"}
+        )
+        final_balance = result.scalar()
+        
+        # Only successful operations should have modified the balance
+        successful_ops = len([r for r in results if r])
+        assert final_balance == 100 - (successful_ops * 10)
