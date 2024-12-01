@@ -10,9 +10,9 @@ from sqlalchemy.pool import AsyncAdaptedQueuePool
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 10
-    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_SIZE: int = 50
+    DB_MAX_OVERFLOW: int = 30
+    DB_POOL_TIMEOUT: int = 20
     DB_ECHO: bool = False
 
     class Config:
@@ -27,9 +27,10 @@ engine = create_async_engine(
     max_overflow=settings.DB_MAX_OVERFLOW,
     pool_timeout=settings.DB_POOL_TIMEOUT,
     pool_pre_ping=True,
-    pool_recycle=3600,
+    pool_recycle=1800,
     pool_use_lifo=True,
-    execution_options={"isolation_level": "READ COMMITTED"}
+    execution_options={"isolation_level": "READ COMMITTED"},
+    connect_args={"command_timeout": 10}
 )
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
