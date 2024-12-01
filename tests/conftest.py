@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.database import Base
 
-TEST_DATABASE_URL = "postgresql+asyncpg://wallet_user:wallet_password@db:5432/wallet_db_test"
+TEST_DATABASE_URL = "postgresql+asyncpg://wallet_user:wallet_password@pgbouncer:6432/wallet_db_test"
 
 @pytest.fixture(scope="session")
 @pytest.mark.asyncio(scope="session")

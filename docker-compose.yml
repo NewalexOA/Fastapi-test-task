@@ -107,14 +107,10 @@ services:
       - POOL_MODE=transaction
       - MAX_CLIENT_CONN=1000
       - DEFAULT_POOL_SIZE=20
-    ports:
-      - "6432:6432"
-    depends_on:
-      db:
-        condition: service_healthy
+    command: sh -c "/generate-userlist.sh && pgbouncer /etc/pgbouncer/pgbouncer.ini"
     volumes:
       - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-      - ./pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+      - ./pgbouncer/generate-userlist.sh:/generate-userlist.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 6432"]
       interval: 10s

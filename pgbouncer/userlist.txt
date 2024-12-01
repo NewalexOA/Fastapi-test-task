@@ -1,0 +1,1 @@
+"wallet_user" "md5<hash_of_password>"

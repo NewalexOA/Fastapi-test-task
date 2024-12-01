@@ -69,3 +69,16 @@ Available at http://localhost:8000/docs
 - 404 - Wallet not found
 - 422 - Validation error (e.g., negative amount)
 - 500 - Internal server error
+
+## PgBouncer Monitoring
+Monitor connection pooling:
+```sql
+-- Active pools
+SHOW POOLS;
+-- Connection stats
+SHOW STATS;
+-- Server status
+SHOW SERVERS;
+-- Current connections
+SHOW CLIENTS;
+```
