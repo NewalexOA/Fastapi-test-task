@@ -27,7 +27,7 @@ class WalletUser(HttpUser):
     @task(2)
     def deposit(self):
         # Deposit (heavy operation)
-        amount = f"{random.uniform(1.0, 100.0):.2f}"  # Добавим случайные суммы
+        amount = f"{random.uniform(1.0, 100.0):.2f}"
         self.client.post(
             f"/api/v1/wallets/{self.wallet_id}/operation",
             json={

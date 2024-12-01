@@ -25,6 +25,7 @@ async def test_long_transaction_monitoring():
         # Check that warning was logged
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("create_tables")
 async def test_database_indexes(engine):
     """Test that required indexes exist"""
     async with engine.connect() as conn:
@@ -33,7 +34,7 @@ async def test_database_indexes(engine):
             FROM pg_indexes 
             WHERE tablename = 'wallets'
         """))
-        indexes = [row[0] for row in result]
+        indexes = [row[0] for row in result.fetchall()]
         assert "idx_wallets_balance" in indexes
 
 @pytest.mark.asyncio
@@ -87,7 +88,7 @@ async def test_database_connection():
     engine = get_engine()
     async with engine.connect() as conn:
         result = await conn.execute(text("SELECT 1"))
-        row = result.first()
+        row = result.fetchone()
         assert row[0] == 1
 
 @pytest.mark.asyncio
@@ -95,11 +96,13 @@ async def test_pgbouncer_connection():
     """Test that connection works properly with PgBouncer"""
     engine = get_engine()
     async with engine.connect() as conn:
+        # Test basic query
         result = await conn.execute(text("SELECT 1"))
-        value = result.scalar()
+        value = result.scalar_one()
         assert value == 1
         
-        # Test transaction
-        async with conn.begin():
-            result = await conn.execute(text("SELECT 1"))
-            assert await result.scalar() == 1
+        # Test transaction in separate connection
+        async with engine.begin() as trans_conn:
+            result = await trans_conn.execute(text("SELECT 1"))
+            value = result.scalar_one()
+            assert value == 1
