@@ -1,0 +1,4 @@
+changeLogFile=changelog.xml
+url=jdbc:postgresql://db:5432/wallet_db
+username=wallet_user
+password=wallet_password
