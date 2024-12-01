@@ -5,6 +5,31 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
     http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
 
+    <!-- Add Liquibase lock table -->
+    <changeSet id="000" author="developer" context="production">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="databasechangeloglock"/>
+            </not>
+        </preConditions>
+        
+        <createTable tableName="databasechangeloglock">
+            <column name="id" type="int">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="locked" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="lockgranted" type="timestamp"/>
+            <column name="lockedby" type="varchar(255)"/>
+        </createTable>
+        
+        <insert tableName="databasechangeloglock">
+            <column name="id" value="1"/>
+            <column name="locked" valueBoolean="false"/>
+        </insert>
+    </changeSet>
+
     <changeSet id="001" author="developer" context="production">
         <comment>Initial database setup</comment>
         
@@ -19,7 +44,7 @@
             <column name="id" type="UUID">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-            <column name="balance" type="DECIMAL(18,2)" defaultValue="0">
+            <column name="balance" type="DECIMAL(18,2)" defaultValueNumeric="0">
                 <constraints nullable="false"/>
             </column>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
@@ -55,31 +80,33 @@
             </column>
         </createTable>
 
-        <!-- Indexes -->
-        <createIndex indexName="idx_wallets_balance" tableName="wallets">
-            <column name="balance"/>
-        </createIndex>
+        <!-- Regular indexes -->
+        <sql>
+            -- Indexes for wallets
+            CREATE INDEX IF NOT EXISTS idx_wallets_balance ON wallets (balance);
+            CREATE INDEX IF NOT EXISTS idx_wallets_updated_at ON wallets (updated_at);
+            
+            -- Indexes for transactions
+            CREATE INDEX IF NOT EXISTS idx_transactions_wallet_id ON transactions (wallet_id);
+            CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions (created_at);
+            CREATE INDEX IF NOT EXISTS idx_transactions_wallet_status ON transactions (wallet_id, status);
+            CREATE INDEX IF NOT EXISTS idx_transactions_operation_type ON transactions (operation_type);
+        </sql>
 
-        <createIndex indexName="idx_transactions_wallet_id" tableName="transactions">
-            <column name="wallet_id"/>
-        </createIndex>
+        <rollback>
+            DROP TABLE IF EXISTS transactions;
+            DROP TABLE IF EXISTS wallets;
+            DROP TYPE IF EXISTS operationtype;
+            DROP TYPE IF EXISTS transactionstatus;
+        </rollback>
+    </changeSet>
 
-        <createIndex indexName="idx_transactions_created_at" tableName="transactions">
-            <column name="created_at"/>
-        </createIndex>
-
-        <createIndex indexName="idx_transactions_wallet_status" tableName="transactions">
-            <column name="wallet_id"/>
-            <column name="status"/>
-        </createIndex>
-
-        <createIndex indexName="idx_transactions_operation_type" tableName="transactions">
-            <column name="operation_type"/>
-        </createIndex>
-    
-        <createIndex indexName="idx_wallets_updated_at" tableName="wallets">
-            <column name="updated_at"/>
-        </createIndex>
+    <changeSet id="002" author="developer" runInTransaction="false">
+        <sql>
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_wallets_balance_ops 
+            ON wallets USING btree (id, balance) 
+            WHERE deleted_at IS NULL;
+        </sql>
     </changeSet>
 
 </databaseChangeLog>
