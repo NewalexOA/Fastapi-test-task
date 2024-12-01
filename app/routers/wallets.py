@@ -10,6 +10,7 @@ from datetime import datetime, UTC
 from uuid import uuid4
 import traceback
 from sqlalchemy.exc import OperationalError
+import asyncio
 
 router = APIRouter()
 
@@ -34,27 +35,46 @@ async def process_operation(
     session: AsyncSession = Depends(get_session)
 ):
     try:
-        _, amount = await update_wallet_balance(
-            session, wallet_id, operation.operation_type, operation.amount
-        )
-        
-        return TransactionResponse(
-            id=uuid4(),
-            wallet_id=wallet_id,
-            amount=amount,
-            operation_type=operation.operation_type,
-            status=TransactionStatus.SUCCESS,
-            created_at=datetime.now(UTC)
-        )
+        for attempt in range(3):
+            try:
+                _, amount = await update_wallet_balance(
+                    session, wallet_id, operation.operation_type, operation.amount
+                )
+                
+                return TransactionResponse(
+                    id=uuid4(),
+                    wallet_id=wallet_id,
+                    amount=amount,
+                    operation_type=operation.operation_type,
+                    status=TransactionStatus.SUCCESS,
+                    created_at=datetime.now(UTC)
+                )
+            except (TooManyConnectionsError, OperationalError) as e:
+                if attempt == 2:
+                    logging.error(f"Database error after retries: {str(e)}")
+                    return TransactionResponse(
+                        id=uuid4(),
+                        wallet_id=wallet_id,
+                        amount=operation.amount,
+                        operation_type=operation.operation_type,
+                        status=TransactionStatus.FAILED,
+                        created_at=datetime.now(UTC)
+                    )
+                await asyncio.sleep(0.1 * (2 ** attempt))
+                
     except HTTPException as http_ex:
         raise http_ex
-    except (TooManyConnectionsError, OperationalError):
-        raise HTTPException(
-            status_code=503,
-            detail="Service temporarily unavailable. Please try again later."
-        )
+        
     except Exception as e:
         logging.error(f"Unexpected error in process_operation: {str(e)}")
         logging.error(traceback.format_exc())
         await session.rollback()
-        raise HTTPException(status_code=500, detail="Internal server error")
+        
+        return TransactionResponse(
+            id=uuid4(),
+            wallet_id=wallet_id,
+            amount=operation.amount,
+            operation_type=operation.operation_type,
+            status=TransactionStatus.FAILED,
+            created_at=datetime.now(UTC)
+        )
